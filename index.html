@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Arquitectura GIRD · SNGR 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',system-ui,sans-serif;background:#07101C;color:#E8EDF2;overflow-x:hidden}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:#07101C}::-webkit-scrollbar-thumb{background:#1E3A5F;border-radius:3px}
+.fade-in{animation:fadeIn .5s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.pulse-dot{animation:pulseDot 2s infinite}
+@keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.4}}
+.glow-blue{box-shadow:0 0 20px rgba(59,130,246,.25)}
+.glow-orange{box-shadow:0 0 20px rgba(249,115,22,.2)}
+.connector-line{stroke-dasharray:6,4;animation:dash 20s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-100}}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;letter-spacing:.4px}
+.nav-link{font-size:12px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:rgba(232,237,242,.5);cursor:pointer;transition:color .2s;white-space:nowrap}
+.nav-link:hover,.nav-link.active{color:#F59E0B}
+.section-label{font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#F59E0B;margin-bottom:10px}
+.card-hover{transition:transform .25s,box-shadow .25s}
+.card-hover:hover{transform:translateY(-4px)}
+.matrix-cell-full{background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.4);color:#4ADE80}
+.matrix-cell-comp{background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);color:#93C5FD}
+.matrix-cell-base{background:rgba(249,115,22,.12);border:1px solid rgba(249,115,22,.3);color:#FCA989}
+.matrix-cell-art{background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.3);color:#C4B5FD}
+.matrix-cell-empty{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:rgba(255,255,255,.2)}
+.filter-btn{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;border:1px solid rgba(255,255,255,.1);cursor:pointer;transition:all .2s;background:transparent;color:rgba(232,237,242,.6)}
+.filter-btn:hover{border-color:rgba(245,158,11,.4);color:#F59E0B}
+.filter-btn.active{background:rgba(245,158,11,.15);border-color:#F59E0B;color:#F59E0B}
+.roadmap-step{position:relative}
+.roadmap-step::after{content:'';position:absolute;bottom:-24px;left:50%;width:2px;height:20px;background:linear-gradient(180deg,rgba(245,158,11,.6),transparent);transform:translateX(-50%)}
+.roadmap-step:last-child::after{display:none}
+.actor-node{transition:all .25s;cursor:default}
+.actor-node:hover{transform:scale(1.05)}
+.toggle-section{cursor:pointer;user-select:none}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useMemo}=React;
+
+// ── ICONS SVG ──────────────────────────────────────
+const Icon={
+  search:()=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+  shield:()=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+  tool:()=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg>,
+  check:()=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>,
+  alert:()=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
+  calendar:()=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  home:()=><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  map:()=><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>,
+  building:()=><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
+  network:()=><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="5" r="3"/><circle cx="19" cy="19" r="3"/><circle cx="5" cy="19" r="3"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="12" y1="14" x2="19" y2="16"/><line x1="12" y1="14" x2="5" y2="16"/></svg>,
+  flow:()=><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 012 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>,
+  doc:()=><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>,
+  users:()=><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>,
+  arrow:()=><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
+  external:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+  chat:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>,
+  chevron:({open})=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{transform:open?'rotate(90deg)':'rotate(0)',transition:'transform .2s'}}><polyline points="9 18 15 12 9 6"/></svg>,
+  target:()=><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
+};
+
+// ── DATA ──────────────────────────────────────────
+const PROCESSES=[
+  {id:1,name:'Conocimiento del Riesgo',short:'Conocimiento',color:'#3B82F6',light:'rgba(59,130,246,.12)',border:'rgba(59,130,246,.35)',icon:'search',desc:'Analizar, evaluar, comprender y comunicar las condiciones de riesgo: amenazas, vulnerabilidades, exposición y capacidades territoriales.',art:9},
+  {id:2,name:'Prevención',short:'Prevención',color:'#10B981',light:'rgba(16,185,129,.12)',border:'rgba(16,185,129,.35)',icon:'shield',desc:'Evitar la generación de nuevas condiciones de riesgo. Regulación de uso del suelo y normas constructivas en zonas de amenaza.',art:10},
+  {id:3,name:'Mitigación',short:'Mitigación',color:'#F59E0B',light:'rgba(245,158,11,.12)',border:'rgba(245,158,11,.35)',icon:'tool',desc:'Reducir las condiciones de riesgo ya existentes mediante obras de protección, reforestación, saneamiento y mejora de infraestructura.',art:11},
+  {id:4,name:'Preparación',short:'Preparación',color:'#8B5CF6',light:'rgba(139,92,246,.12)',border:'rgba(139,92,246,.35)',icon:'check',desc:'Fortalecer capacidades institucionales y comunitarias para anticipar, responder y adaptarse a los impactos de desastres.',art:12},
+  {id:5,name:'Respuesta',short:'Respuesta',color:'#EF4444',light:'rgba(239,68,68,.12)',border:'rgba(239,68,68,.35)',icon:'alert',desc:'Atención humanitaria de emergencias: activación del COE, búsqueda y rescate, albergues y coordinación interinstitucional.',art:13},
+  {id:6,name:'Prep. Recuperación',short:'Prep. Recup.',color:'#06B6D4',light:'rgba(6,182,212,.12)',border:'rgba(6,182,212,.35)',icon:'calendar',desc:'Planificación anticipada de la recuperación: EDAN, protocolos de rehabilitación y mecanismos de reasentamiento.',art:14},
+  {id:7,name:'Recuperación',short:'Recuperación',color:'#F97316',light:'rgba(249,115,22,.12)',border:'rgba(249,115,22,.35)',icon:'home',desc:'Reconstrucción de infraestructura, rehabilitación de servicios y recuperación de medios de vida y la economía local.',art:15},
+];
+
+const FAMILIES=[
+  {id:'eval',name:'Evaluación PDOT',short:'Eval. PDOT',color:'#3B82F6',light:'rgba(59,130,246,.12)',border:'rgba(59,130,246,.35)',icon:'map',desc:'Metodología e informe de evaluación de la integración GIRD-ACC en los 195 PDOTs cantonales 2023–2027.',docs:2},
+  {id:'ugr',name:'Lineamientos Nacionales UGR',short:'Lin. UGR',color:'#8B5CF6',light:'rgba(139,92,246,.12)',border:'rgba(139,92,246,.35)',icon:'building',desc:'Lineamientos para la organización y funcionamiento de las Unidades de Gestión de Riesgos en el nivel nacional.',docs:3},
+  {id:'gob',name:'Lineamientos de Gobernanza',short:'Gobernanza',color:'#10B981',light:'rgba(16,185,129,.12)',border:'rgba(16,185,129,.35)',icon:'network',desc:'Marco de coordinación y gobernanza multinivel del Sistema Nacional Descentralizado de Gestión de Riesgos.',docs:2},
+  {id:'mod',name:'Modelos de Gestión',short:'Mod. Gestión',color:'#F59E0B',light:'rgba(245,158,11,.12)',border:'rgba(245,158,11,.35)',icon:'flow',desc:'Guías metodológicas para organizar la gestión municipal y territorial de la GIRD con 135 procesos homologados.',docs:4},
+  {id:'plan',name:'Planes Locales GIRD',short:'Planes GIRD',color:'#EF4444',light:'rgba(239,68,68,.12)',border:'rgba(239,68,68,.35)',icon:'doc',desc:'Guía paso a paso para el desarrollo del Plan de Gestión Integral de Riesgos Climáticos y Desastres Cantonal (PGIRCD-C).',docs:6},
+];
+
+// D=directo, C=complementario, I=insumo base, A=articulador, null=no aplica
+const MATRIX={
+  eval: ['I','C','C','C',null,null,null],
+  ugr:  ['D','D','D','D','D','D','D'],
+  gob:  ['C','D','C','D','D','D','D'],
+  mod:  ['C','D','D','D','D','D','D'],
+  plan: ['D','D','D','D','D','D','D'],
+};
+
+const DOCUMENTS=[
+  {id:1,name:'Metodología de Evaluación PDOT-GIRD 2023–2027',family:'eval',processes:[1,2,3],aporte:'I',nivel:'Nacional',actor:'DPEGR-SNGR',resultado:'Evidencia territorial cuantificada de brechas GIRD',estado:'Borrador técnico',archivo:'1.METODOLOGIA_EVALUACION_PDOT_2023-2027_02-06-2026.docx',url:'https://drive.google.com/drive/folders/1TeWnIQSHeIQjycR4yEbhljWsOJ5Q7srq?usp=sharing'},
+  {id:2,name:'Informe Nacional Evaluación PDOT-GIRD 2023–2027',family:'eval',processes:[1,2,3,4],aporte:'D',nivel:'Nacional',actor:'DPEGR-SNGR / SOT',resultado:'Diagnóstico de 195 PDOTs: puntajes, brechas y recomendaciones',estado:'Borrador técnico',archivo:'2.INFORME_EVALUACION_PDOT_2023-2027_GIRD_14-06-2026.docx',url:'https://drive.google.com/drive/folders/1TeWnIQSHeIQjycR4yEbhljWsOJ5Q7srq?usp=sharing'},
+  {id:3,name:'Diagnóstico Modelos de Gestión Municipal',family:'mod',processes:[1,2,3,4,5,6,7],aporte:'I',nivel:'Municipal',actor:'GAD Municipal / UGR',resultado:'Línea base institucional para organizar la UGR',estado:'Borrador técnico',archivo:'1. Diagnóstico_Modelos_de_gestión_municipal_FINAL.docx',url:'https://drive.google.com/drive/folders/1wYKW9LWcIdByS1cjc1GRhGXbBHYpNsov?usp=sharing'},
+  {id:4,name:'Guía Metodológica: Modelo de Gestión Municipal GIRD-ACC',family:'mod',processes:[2,3,4,5,6,7],aporte:'D',nivel:'Municipal',actor:'GAD Municipal / UGR',resultado:'Estructura organizativa y 135 procesos homologados de la UGR',estado:'Borrador técnico',archivo:'2. Guia modelo de gestión municipal FINAL.docx',url:'https://drive.google.com/drive/folders/1wYKW9LWcIdByS1cjc1GRhGXbBHYpNsov?usp=sharing'},
+  {id:5,name:'Diagnóstico: Comité Territorial Cantonal GIRD',family:'gob',processes:[1,4,5,6,7],aporte:'I',nivel:'Cantonal',actor:'GAD Municipal / Comité Cantonal',resultado:'Diagnóstico de gobernanza territorial cantonal',estado:'Borrador técnico',archivo:'1. Diagnóstico orientado al Comité Territorial Cantonal.docx',url:'https://drive.google.com/drive/folders/1ODjcwN-velFqS3WhlsfJ69VS_X2BQCiN?usp=sharing'},
+  {id:6,name:'Guía Metodológica: Modelo Cantonal GIRD',family:'gob',processes:[2,3,4,5,6,7],aporte:'D',nivel:'Cantonal',actor:'GAD Municipal / Comité Cantonal',resultado:'Marco de gobernanza y ordenanza cantonal GIRD',estado:'Borrador técnico',archivo:'2. Guia Metodológica del Modelo Cantonal para la GIRD.docx',url:'https://drive.google.com/drive/folders/1ODjcwN-velFqS3WhlsfJ69VS_X2BQCiN?usp=sharing'},
+  {id:7,name:'PGIRCD-C: Guía Paso a Paso — Introducción',family:'plan',processes:[1,2,3,4,5,6,7],aporte:'D',nivel:'Cantonal',actor:'GAD Municipal / Equipo técnico',resultado:'Marco metodológico y lógica del PGIRCD-C',estado:'Borrador técnico',archivo:'01 Guía paso a paso Introducción.docx',url:'https://drive.google.com/drive/folders/1jlI7UGW2DA87GHfxIguu9mE4AutBbwxr?usp=sharing'},
+  {id:8,name:'PGIRCD-C: Fase Preparativa',family:'plan',processes:[1,4],aporte:'D',nivel:'Cantonal',actor:'GAD / UGR / Equipo',resultado:'Estructura institucional y mecanismos de coordinación',estado:'Borrador técnico',archivo:'02 Guía paso a paso Capítulo 2 Fase preparativa_EDITADO.docx',url:'https://drive.google.com/drive/folders/1jlI7UGW2DA87GHfxIguu9mE4AutBbwxr?usp=sharing'},
+  {id:9,name:'PGIRCD-C: Fase de Diagnóstico',family:'plan',processes:[1,2,3],aporte:'D',nivel:'Cantonal',actor:'GAD / UGR / Equipo técnico',resultado:'Diagnóstico territorial multiamenaza y vulnerabilidades',estado:'Borrador técnico',archivo:'03 Guía paso a paso Capítulo 3 Fase diagnóstico_EDITADO.docx',url:'https://drive.google.com/drive/folders/1jlI7UGW2DA87GHfxIguu9mE4AutBbwxr?usp=sharing'},
+  {id:10,name:'PGIRCD-C: Fase de Propuesta',family:'plan',processes:[2,3,4,5,6,7],aporte:'D',nivel:'Cantonal',actor:'GAD / UGR / Planificación',resultado:'Objetivos, metas, proyectos y cartera GIRD cantonal',estado:'Borrador técnico',archivo:'04 Guía paso a paso Capítulo 4 Fase propuesta_EDITADO.docx',url:'https://drive.google.com/drive/folders/1jlI7UGW2DA87GHfxIguu9mE4AutBbwxr?usp=sharing'},
+  {id:11,name:'PGIRCD-C: Modelo de Gestión Local',family:'plan',processes:[4,5,6,7],aporte:'D',nivel:'Cantonal',actor:'GAD / UGR / Autoridades',resultado:'Modelo de gestión, financiamiento y seguimiento',estado:'Borrador técnico',archivo:'05 Guía paso a paso Capítulo 5 Fase modelo de gestión_EDITADO.docx',url:'https://drive.google.com/drive/folders/1jlI7UGW2DA87GHfxIguu9mE4AutBbwxr?usp=sharing'},
+  {id:12,name:'PGIRCD-C: Herramientas y Anexos',family:'plan',processes:[1,2,3,4,5,6,7],aporte:'C',nivel:'Cantonal',actor:'GAD / Equipos técnicos',resultado:'Plantillas, matrices y herramientas de implementación',estado:'Borrador técnico',archivo:'06 Guía paso a paso Herramientas.docx',url:'https://drive.google.com/drive/folders/1jlI7UGW2DA87GHfxIguu9mE4AutBbwxr?usp=sharing'},
+];
+
+const ACTORS=[
+  {id:'sngr',name:'SNGR',full:'Secretaría Nacional de Gestión de Riesgos',rol:'Revisar y validar',color:'#3B82F6',type:'nacional'},
+  {id:'dpegr',name:'DPEGR',full:'Dirección de Políticas y Estándares',rol:'Elaborar y proponer',color:'#8B5CF6',type:'tecnico'},
+  {id:'subsec',name:'Subsecretaría',full:'Subsecretaría Nacional',rol:'Validar y aprobar',color:'#10B981',type:'nacional'},
+  {id:'zonal',name:'Coordinaciones Zonales',full:'9 Coordinaciones Zonales SNGR',rol:'Acompañar y aplicar',color:'#F59E0B',type:'zonal'},
+  {id:'gad',name:'GAD Municipal',full:'221 GAD Municipales',rol:'Implementar',color:'#EF4444',type:'local'},
+  {id:'ugr',name:'UGR',full:'Unidades de Gestión de Riesgos',rol:'Ejecutar y monitorear',color:'#06B6D4',type:'local'},
+  {id:'coop',name:'Cooperación',full:'Organismos internacionales',rol:'Financiar y asesorar',color:'#F97316',type:'externo'},
+  {id:'sot',name:'SOT',full:'Superintendencia de Ordenamiento Territorial',rol:'Articular PDOT',color:'#EC4899',type:'nacional'},
+];
+
+const ROADMAP=[
+  {n:1,name:'Revisión técnica interna',desc:'Revisión de consistencia, coherencia metodológica y alineación LOGIRD por parte del equipo DPEGR.',estado:'Listo',color:'#10B981'},
+  {n:2,name:'Validación institucional',desc:'Presentación a las autoridades de la SNGR y subsecretarías para validación y priorización.',estado:'En proceso',color:'#F59E0B'},
+  {n:3,name:'Revisión jurídica',desc:'Análisis de las implicaciones normativas y alineación con el marco legal vigente (LOGIRD, COOTAD, LOOTUGS).',estado:'Pendiente',color:'#6B7280'},
+  {n:4,name:'Priorización documental',desc:'Decisión sobre qué instrumentos publicar primero, cuáles como guías, cuáles como herramientas de apoyo.',estado:'Pendiente',color:'#6B7280'},
+  {n:5,name:'Pilotaje territorial',desc:'Aplicación en 3-5 cantones piloto para validación metodológica de los Planes Locales GIRD.',estado:'Pendiente',color:'#6B7280'},
+  {n:6,name:'Ajuste metodológico',desc:'Incorporación de observaciones del pilotaje y mejoras al paquete técnico completo.',estado:'Pendiente',color:'#6B7280'},
+  {n:7,name:'Publicación en Google Sites',desc:'Migración del prototipo a sitio web institucional oficial con acceso para GAD y SNGR.',estado:'Pendiente',color:'#6B7280'},
+  {n:8,name:'Implementación progresiva',desc:'Despliegue en coordinaciones zonales con capacitación a equipos técnicos de los GAD.',estado:'Pendiente',color:'#6B7280'},
+  {n:9,name:'Seguimiento y mejora continua',desc:'Sistema de monitoreo de la implementación, retroalimentación y actualización del paquete técnico.',estado:'Pendiente',color:'#6B7280'},
+];
+
+const APORTE_META={
+  'D':{label:'Directo',cls:'matrix-cell-full',short:'D'},
+  'C':{label:'Complementario',cls:'matrix-cell-comp',short:'C'},
+  'I':{label:'Insumo base',cls:'matrix-cell-base',short:'I'},
+  'A':{label:'Articulador',cls:'matrix-cell-art',short:'A'},
+  null:{label:'—',cls:'matrix-cell-empty',short:'—'},
+};
+
+// ── SECTION COMPONENTS ───────────────────────────────
+
+// Central Architecture Diagram (SVG)
+function ArchDiagram(){
+  const [hov,setHov]=useState(null);
+  const W=800,H=520,CX=400,CY=260;
+  const R1=115,R2=220;
+
+  const procPos=PROCESSES.map((_,i)=>{
+    const a=(-Math.PI/2)+(2*Math.PI*i/7);
+    return {x:CX+R1*Math.cos(a),y:CY+R1*Math.sin(a)};
+  });
+  const famPos=FAMILIES.map((_,i)=>{
+    const a=(-Math.PI/2)+(2*Math.PI*i/5);
+    return {x:CX+R2*Math.cos(a),y:CY+R2*Math.sin(a)};
+  });
+
+  return(
+    <div style={{width:'100%',overflowX:'auto'}}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',maxWidth:W,display:'block',margin:'0 auto'}}>
+        {/* BG glow */}
+        <defs>
+          <radialGradient id="gCenter" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="rgba(59,130,246,.25)"/>
+            <stop offset="100%" stopColor="rgba(59,130,246,0)"/>
+          </radialGradient>
+          <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <circle cx={CX} cy={CY} r="180" fill="url(#gCenter)" opacity=".4"/>
+
+        {/* Lines fam→proc */}
+        {FAMILIES.map((f,fi)=>PROCESSES.map((p,pi)=>(
+          <line key={`fp-${fi}-${pi}`}
+            x1={famPos[fi].x} y1={famPos[fi].y}
+            x2={procPos[pi].x} y2={procPos[pi].y}
+            stroke={f.color} strokeWidth="0.5" opacity=".12"/>
+        )))}
+
+        {/* Lines center→proc */}
+        {procPos.map((pp,i)=>(
+          <line key={`cp-${i}`} x1={CX} y1={CY} x2={pp.x} y2={pp.y}
+            stroke={PROCESSES[i].color} strokeWidth="1.5" opacity=".35"
+            className="connector-line"/>
+        ))}
+
+        {/* Lines proc→fam */}
+        {procPos.map((pp,pi)=>famPos.map((fp,fi)=>(
+          <line key={`pf-${pi}-${fi}`} x1={pp.x} y1={pp.y} x2={fp.x} y2={fp.y}
+            stroke={PROCESSES[pi].color} strokeWidth="0.8" opacity={hov===`p${pi}` || hov===`f${fi}` ? .5 : .08}
+            style={{transition:'opacity .2s'}}/>
+        )))}
+
+        {/* Process nodes */}
+        {PROCESSES.map((p,i)=>(
+          <g key={p.id} transform={`translate(${procPos[i].x},${procPos[i].y})`}
+            onMouseEnter={()=>setHov(`p${i}`)} onMouseLeave={()=>setHov(null)}
+            style={{cursor:'pointer'}}>
+            <circle r={hov===`p${i}`?32:28} fill={p.light} stroke={p.color}
+              strokeWidth={hov===`p${i}`?2:1.5} style={{transition:'all .2s'}} filter="url(#glow)"/>
+            <text textAnchor="middle" dy=".4em" fontSize="13" fontWeight="700" fill={p.color}>
+              {p.id}
+            </text>
+            <text textAnchor="middle" dy="44" fontSize="9.5" fontWeight="600"
+              fill="rgba(232,237,242,.75)" style={{textTransform:'uppercase',letterSpacing:.5}}>
+              {p.short.split(' ').slice(0,1).join(' ')}
+            </text>
+          </g>
+        ))}
+
+        {/* Family nodes */}
+        {FAMILIES.map((f,i)=>(
+          <g key={f.id} transform={`translate(${famPos[i].x},${famPos[i].y})`}
+            onMouseEnter={()=>setHov(`f${i}`)} onMouseLeave={()=>setHov(null)}
+            style={{cursor:'pointer'}}>
+            <rect x="-42" y="-20" width="84" height="40" rx="8"
+              fill={hov===`f${i}`?"rgba(255,255,255,.09)":f.light}
+              stroke={f.color} strokeWidth={hov===`f${i}`?2:1}
+              style={{transition:'all .2s'}} filter="url(#glow)"/>
+            <text textAnchor="middle" dy=".35em" fontSize="9.5" fontWeight="700" fill={f.color}
+              style={{textTransform:'uppercase',letterSpacing:.4}}>
+              {f.short}
+            </text>
+          </g>
+        ))}
+
+        {/* Center node */}
+        <g transform={`translate(${CX},${CY})`}>
+          <circle r="52" fill="rgba(15,29,46,.95)" stroke="rgba(59,130,246,.7)" strokeWidth="2.5" filter="url(#glow)"/>
+          <circle r="48" fill="rgba(30,63,125,.25)" stroke="rgba(59,130,246,.3)" strokeWidth="1"/>
+          <text textAnchor="middle" dy="-6" fontSize="13" fontWeight="900" fill="#93C5FD" letterSpacing="1">LOGIRD</text>
+          <text textAnchor="middle" dy="10" fontSize="8.5" fill="rgba(147,197,253,.6)" letterSpacing="1">7 PROCESOS</text>
+          <text textAnchor="middle" dy="22" fontSize="8.5" fill="rgba(147,197,253,.6)" letterSpacing="1">5 FAMILIAS</text>
+        </g>
+
+        {/* Legend top */}
+        <text x="20" y="22" fontSize="9" fill="rgba(232,237,242,.35)" fontWeight="600" letterSpacing="1.5" textTransform="uppercase">CÍRCULO INTERNO: 7 PROCESOS LOGIRD</text>
+        <text x="20" y="36" fontSize="9" fill="rgba(232,237,242,.25)" letterSpacing="1.5">CÍRCULO EXTERNO: 5 FAMILIAS DE INSTRUMENTOS</text>
+      </svg>
+
+      {/* Process legend */}
+      <div style={{display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center',marginTop:16}}>
+        {PROCESSES.map(p=>(
+          <div key={p.id} style={{display:'flex',alignItems:'center',gap:6,padding:'4px 10px',
+            background:`rgba(${hexToRgb(p.color)},.1)`,borderRadius:6,border:`1px solid ${p.color}40`}}>
+            <span style={{width:8,height:8,borderRadius:'50%',background:p.color,display:'block'}}/>
+            <span style={{fontSize:10,fontWeight:600,color:p.color}}>{p.id}. {p.short}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function hexToRgb(hex){
+  const r=/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return r?`${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}`:'0,0,0';
+}
+
+// Relation Map
+function RelationMap(){
+  const nodes=[
+    {id:'eval',label:'Evaluación\nPDOT',x:50,y:50,color:'#3B82F6'},
+    {id:'plan',label:'Planes\nLocales GIRD',x:50,y:200,color:'#EF4444'},
+    {id:'mod',label:'Modelos de\nGestión',x:220,y:125,color:'#F59E0B'},
+    {id:'gob',label:'Lineamientos\nGobernanza',x:390,y:125,color:'#10B981'},
+    {id:'ugr',label:'Lineamientos\nUGR',x:560,y:50,color:'#8B5CF6'},
+    {id:'impl',label:'Implementación\ny Seguimiento',x:560,y:200,color:'#06B6D4'},
+  ];
+  const conns=[
+    {from:'eval',to:'plan',label:'genera evidencia para'},
+    {from:'plan',to:'mod',label:'alimentan'},
+    {from:'mod',to:'gob',label:'requieren'},
+    {from:'gob',to:'ugr',label:'se sostienen en'},
+    {from:'ugr',to:'impl',label:'habilitan'},
+    {from:'eval',to:'mod',label:'orienta'},
+  ];
+
+  const nodeMap=Object.fromEntries(nodes.map(n=>[n.id,n]));
+
+  return(
+    <div style={{position:'relative',width:'100%',overflowX:'auto'}}>
+      <svg viewBox="0 0 680 280" style={{width:'100%',maxWidth:680,display:'block',margin:'0 auto'}}>
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0,8 3,0 6" fill="rgba(245,158,11,.5)"/>
+          </marker>
+        </defs>
+        {conns.map((c,i)=>{
+          const a=nodeMap[c.from],b=nodeMap[c.to];
+          const ax=a.x+60,ay=a.y+30,bx=b.x,by=b.y+30;
+          const mx=(ax+bx)/2,my=(ay+by)/2;
+          return(
+            <g key={i}>
+              <line x1={ax} y1={ay} x2={bx} y2={by}
+                stroke="rgba(245,158,11,.3)" strokeWidth="1.5" markerEnd="url(#arr)"/>
+              <rect x={mx-38} y={my-10} width="76" height="18" rx="4" fill="rgba(7,16,28,.9)"/>
+              <text x={mx} y={my+4} textAnchor="middle" fontSize="8.5" fill="rgba(245,158,11,.8)" fontWeight="500">{c.label}</text>
+            </g>
+          );
+        })}
+        {nodes.map(n=>(
+          <g key={n.id} transform={`translate(${n.x},${n.y})`}>
+            <rect width="110" height="60" rx="10"
+              fill={`rgba(${hexToRgb(n.color)},.12)`} stroke={n.color} strokeWidth="1.5"/>
+            {n.label.split('\n').map((l,i)=>(
+              <text key={i} x="55" y={20+i*16} textAnchor="middle" fontSize="11" fontWeight="700" fill={n.color}>{l}</text>
+            ))}
+          </g>
+        ))}
+      </svg>
+      <p style={{textAlign:'center',fontSize:13,color:'rgba(232,237,242,.45)',marginTop:16,fontStyle:'italic'}}>
+        "Cada instrumento tiene una función dentro del sistema: diagnosticar, organizar, coordinar, planificar, financiar, implementar o monitorear."
+      </p>
+    </div>
+  );
+}
+
+// Matrix Component
+function IntegralMatrix(){
+  return(
+    <div style={{overflowX:'auto'}}>
+      {/* Legend */}
+      <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:20}}>
+        {Object.entries(APORTE_META).filter(([k])=>k!=='null').map(([k,v])=>(
+          <div key={k} className={`chip ${v.cls}`}><span>{v.short}</span>{v.label}</div>
+        ))}
+      </div>
+      <table style={{width:'100%',borderCollapse:'separate',borderSpacing:3}}>
+        <thead>
+          <tr>
+            <th style={{padding:'8px 12px',fontSize:11,fontWeight:700,color:'rgba(232,237,242,.5)',textAlign:'left',letterSpacing:.5,background:'rgba(255,255,255,.03)',borderRadius:6}}>INSTRUMENTO</th>
+            {PROCESSES.map(p=>(
+              <th key={p.id} style={{padding:'8px 6px',fontSize:10,fontWeight:700,color:p.color,textAlign:'center',letterSpacing:.4,background:`rgba(${hexToRgb(p.color)},.06)`,borderRadius:6,minWidth:72,whiteSpace:'normal',verticalAlign:'bottom'}}>
+                {p.short}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {FAMILIES.map(f=>{
+            const row=MATRIX[f.id];
+            return(
+              <tr key={f.id}>
+                <td style={{padding:'8px 12px',fontSize:12,fontWeight:700,color:f.color,background:f.light,borderRadius:6,borderLeft:`3px solid ${f.color}`}}>
+                  {f.name}
+                </td>
+                {row.map((cell,ci)=>{
+                  const meta=APORTE_META[cell];
+                  return(
+                    <td key={ci} style={{padding:4,textAlign:'center'}}>
+                      <div className={`chip ${meta.cls}`} style={{justifyContent:'center',margin:'0 auto',width:32,padding:'3px 0'}}>
+                        {meta.short}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Roadmap
+function Roadmap(){
+  const colores={
+    'Listo':'#10B981','En proceso':'#F59E0B','Pendiente':'#4B5563'
+  };
+  const [open,setOpen]=useState(null);
+  return(
+    <div style={{display:'flex',flexDirection:'column',gap:0,maxWidth:700,margin:'0 auto'}}>
+      {ROADMAP.map((s,i)=>(
+        <div key={s.n} className="roadmap-step" style={{display:'flex',gap:20,paddingBottom:24}}>
+          {/* Left column */}
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',flexShrink:0}}>
+            <div style={{width:44,height:44,borderRadius:'50%',background:`rgba(${hexToRgb(s.color)},.18)`,
+              border:`2px solid ${s.color}`,display:'flex',alignItems:'center',justifyContent:'center',
+              fontSize:15,fontWeight:900,color:s.color}}>
+              {s.n}
+            </div>
+            {i<ROADMAP.length-1 && (
+              <div style={{width:2,flex:1,marginTop:6,background:`linear-gradient(180deg,${s.color}66,transparent)`,minHeight:20}}/>
+            )}
+          </div>
+          {/* Content */}
+          <div style={{flex:1,paddingTop:8,cursor:'pointer'}}
+            onClick={()=>setOpen(open===s.n?null:s.n)}
+            className="toggle-section">
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+              <span style={{fontSize:14,fontWeight:700,color:'rgba(232,237,242,.9)'}}>{s.name}</span>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <span className="chip" style={{background:`rgba(${hexToRgb(s.color)},.12)`,color:s.color,border:`1px solid ${s.color}40`,fontSize:11}}>
+                  <span className={s.estado==='Pendiente'?'':'pulse-dot'} style={{width:5,height:5,borderRadius:'50%',background:s.color,display:'inline-block'}}/>
+                  {s.estado}
+                </span>
+                <Icon.chevron open={open===s.n}/>
+              </div>
+            </div>
+            {open===s.n && (
+              <p style={{fontSize:13,color:'rgba(232,237,242,.55)',lineHeight:1.7,marginTop:6}} className="fade-in">
+                {s.desc}
+              </p>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Actor Map
+function ActorMap(){
+  const typeColor={nacional:'#3B82F6',tecnico:'#8B5CF6',zonal:'#F59E0B',local:'#EF4444',externo:'#06B6D4'};
+  return(
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:16}}>
+      {ACTORS.map(a=>(
+        <div key={a.id} className="card-hover" style={{background:'rgba(255,255,255,.04)',border:`1px solid ${a.color}30`,
+          borderRadius:12,padding:20,borderTop:`3px solid ${a.color}`}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+            <div style={{width:38,height:38,borderRadius:'50%',background:`rgba(${hexToRgb(a.color)},.18)`,
+              border:`2px solid ${a.color}55`,display:'flex',alignItems:'center',justifyContent:'center',
+              fontSize:11,fontWeight:800,color:a.color}}>
+              {a.name.slice(0,3)}
+            </div>
+            <div>
+              <div style={{fontSize:13,fontWeight:800,color:'rgba(232,237,242,.9)'}}>{a.name}</div>
+              <span className="chip" style={{background:`${typeColor[a.type]}20`,color:typeColor[a.type],border:`1px solid ${typeColor[a.type]}30`,marginTop:2}}>
+                {a.type}
+              </span>
+            </div>
+          </div>
+          <p style={{fontSize:11.5,color:'rgba(232,237,242,.5)',lineHeight:1.5,marginBottom:8}}>{a.full}</p>
+          <div style={{background:`rgba(${hexToRgb(a.color)},.1)`,borderRadius:6,padding:'5px 10px',
+            fontSize:12,fontWeight:600,color:a.color}}>
+            → {a.rol}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Decision Flow
+function DecisionFlow(){
+  const steps=[
+    {q:'¿Está alineado con la LOGIRD?',stage:'Borrador técnico',color:'#3B82F6',icon:'doc'},
+    {q:'¿Hay coherencia interna y entre instrumentos?',stage:'Revisión técnica',color:'#8B5CF6',icon:'check'},
+    {q:'¿Es aplicable territorialmente con los GAD?',stage:'Validación LOGIRD',color:'#10B981',icon:'map'},
+    {q:'¿Requiere revisión jurídica específica?',stage:'Priorización',color:'#F59E0B',icon:'building'},
+    {q:'¿Qué actor lidera su implementación?',stage:'Publicación inicial',color:'#F97316',icon:'users'},
+    {q:'¿Cómo se validará en territorio?',stage:'Pilotaje',color:'#EF4444',icon:'target'},
+    {q:'¿Cómo se hará seguimiento y mejora?',stage:'Implementación',color:'#06B6D4',icon:'flow'},
+  ];
+  return(
+    <div style={{display:'flex',flexDirection:'column',gap:0,maxWidth:680,margin:'0 auto'}}>
+      {steps.map((s,i)=>(
+        <div key={i} style={{display:'flex',gap:0}}>
+          {/* Node */}
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',width:60,flexShrink:0}}>
+            <div style={{width:48,height:48,borderRadius:10,background:`rgba(${hexToRgb(s.color)},.15)`,
+              border:`2px solid ${s.color}55`,display:'flex',alignItems:'center',justifyContent:'center',color:s.color}}>
+              {Icon[s.icon]?.()}
+            </div>
+            {i<steps.length-1 && (
+              <div style={{width:2,height:32,background:`linear-gradient(180deg,${s.color}80,transparent)`}}/>
+            )}
+          </div>
+          {/* Content */}
+          <div style={{flex:1,paddingLeft:16,paddingBottom:i<steps.length-1?32:0,paddingTop:4}}>
+            <span className="chip" style={{background:`rgba(${hexToRgb(s.color)},.12)`,color:s.color,
+              border:`1px solid ${s.color}35`,marginBottom:6,fontSize:10}}>{s.stage}</span>
+            <p style={{fontSize:13.5,fontWeight:600,color:'rgba(232,237,242,.85)',lineHeight:1.5}}>
+              {s.q}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Results Panel
+function ResultsPanel(){
+  const items=[
+    {icon:'🗺️',label:'Evidencia territorial disponible',desc:'195 PDOTs evaluados, brechas documentadas por cantón, zona y provincia'},
+    {icon:'📊',label:'Brechas institucionales identificadas',desc:'Diagnóstico sistemático de las debilidades en GIRD para 221 GAD'},
+    {icon:'🏛️',label:'UGR orientadas metodológicamente',desc:'Guía de 135 procesos homologados para organizar la unidad de riesgo'},
+    {icon:'🤝',label:'Gobernanza fortalecida',desc:'Marcos de coordinación cantonal y comité territorial operativos'},
+    {icon:'⚙️',label:'Modelos de gestión estructurados',desc:'Proceso para definir el modelo de gestión municipal GIRD-ACC'},
+    {icon:'📋',label:'Planes locales formulables',desc:'Guía paso a paso para que cualquier GAD formule su PGIRCD-C'},
+    {icon:'💰',label:'Financiamiento identificable',desc:'Estructura para identificar fuentes de inversión GIRD en el PDOT'},
+    {icon:'📈',label:'Seguimiento posible',desc:'Indicadores y mecanismos de monitoreo de la implementación'},
+    {icon:'🔄',label:'Implementación progresiva habilitada',desc:'Ruta gradual aplicable según capacidades territoriales de cada GAD'},
+  ];
+  return(
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:16}}>
+      {items.map((it,i)=>(
+        <div key={i} className="card-hover" style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.08)',
+          borderRadius:12,padding:20,display:'flex',gap:14,alignItems:'flex-start'}}>
+          <span style={{fontSize:26,flexShrink:0}}>{it.icon}</span>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:'rgba(232,237,242,.9)',marginBottom:5}}>{it.label}</div>
+            <p style={{fontSize:12,color:'rgba(232,237,242,.45)',lineHeight:1.6}}>{it.desc}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Document Cards
+function DocCards({filterFamily,filterProcess}){
+  const filtered=DOCUMENTS.filter(d=>{
+    if(filterFamily && d.family!==filterFamily) return false;
+    if(filterProcess && !d.processes.includes(filterProcess)) return false;
+    return true;
+  });
+  if(!filtered.length) return(
+    <div style={{textAlign:'center',padding:'48px 24px',color:'rgba(232,237,242,.3)',fontSize:14}}>
+      No hay documentos para los filtros seleccionados.
+    </div>
+  );
+  return(
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(340px,1fr))',gap:20}}>
+      {filtered.map(doc=>{
+        const fam=FAMILIES.find(f=>f.id===doc.family);
+        const meta=APORTE_META[doc.aporte];
+        return(
+          <div key={doc.id} className="card-hover" style={{background:'rgba(255,255,255,.04)',
+            border:`1px solid ${fam.color}25`,borderRadius:14,padding:24,borderTop:`3px solid ${fam.color}`,
+            display:'flex',flexDirection:'column',gap:14}}>
+            {/* Header */}
+            <div>
+              <span className="chip" style={{background:`rgba(${hexToRgb(fam.color)},.15)`,color:fam.color,
+                border:`1px solid ${fam.color}40`,marginBottom:8,fontSize:10}}>
+                {fam.name}
+              </span>
+              <h3 style={{fontSize:13.5,fontWeight:800,color:'rgba(232,237,242,.92)',lineHeight:1.5}}>{doc.name}</h3>
+            </div>
+            {/* Meta grid */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,fontSize:11}}>
+              <div style={{background:'rgba(255,255,255,.04)',borderRadius:6,padding:'6px 10px'}}>
+                <div style={{color:'rgba(232,237,242,.35)',marginBottom:2,fontSize:10,fontWeight:600,letterSpacing:.5}}>APORTE</div>
+                <span className={`chip ${meta.cls}`} style={{fontSize:10}}>{meta.label}</span>
+              </div>
+              <div style={{background:'rgba(255,255,255,.04)',borderRadius:6,padding:'6px 10px'}}>
+                <div style={{color:'rgba(232,237,242,.35)',marginBottom:2,fontSize:10,fontWeight:600,letterSpacing:.5}}>NIVEL</div>
+                <span style={{color:'rgba(232,237,242,.8)',fontWeight:600}}>{doc.nivel}</span>
+              </div>
+              <div style={{background:'rgba(255,255,255,.04)',borderRadius:6,padding:'6px 10px'}}>
+                <div style={{color:'rgba(232,237,242,.35)',marginBottom:2,fontSize:10,fontWeight:600,letterSpacing:.5}}>ACTOR</div>
+                <span style={{color:'rgba(232,237,242,.7)',fontSize:11}}>{doc.actor}</span>
+              </div>
+              <div style={{background:'rgba(255,255,255,.04)',borderRadius:6,padding:'6px 10px'}}>
+                <div style={{color:'rgba(232,237,242,.35)',marginBottom:2,fontSize:10,fontWeight:600,letterSpacing:.5}}>ESTADO</div>
+                <span style={{color:'#F59E0B',fontWeight:600,fontSize:11}}>{doc.estado}</span>
+              </div>
+            </div>
+            {/* Processes */}
+            <div>
+              <div style={{fontSize:10,fontWeight:600,color:'rgba(232,237,242,.35)',letterSpacing:.5,marginBottom:6}}>PROCESOS LOGIRD</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                {doc.processes.map(pid=>{
+                  const p=PROCESSES.find(x=>x.id===pid);
+                  return(
+                    <span key={pid} className="chip" style={{background:`rgba(${hexToRgb(p.color)},.12)`,
+                      color:p.color,border:`1px solid ${p.color}35`,fontSize:10}}>
+                      {pid}. {p.short}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Resultado */}
+            <div style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:'8px 12px',borderLeft:`2px solid ${fam.color}60`}}>
+              <div style={{fontSize:10,fontWeight:600,color:'rgba(232,237,242,.35)',letterSpacing:.5,marginBottom:3}}>RESULTADO ESPERADO</div>
+              <p style={{fontSize:12,color:'rgba(232,237,242,.65)',lineHeight:1.5}}>{doc.resultado}</p>
+            </div>
+            {/* Buttons */}
+            <div style={{display:'flex',gap:8,marginTop:'auto'}}>
+              <button style={{flex:1,padding:'8px 12px',background:`rgba(${hexToRgb(fam.color)},.15)`,
+                border:`1px solid ${fam.color}40`,borderRadius:7,color:fam.color,fontSize:12,fontWeight:600,
+                cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:5}}
+                onClick={()=>window.open(doc.url,'_blank')}>
+                <span style={{paddingTop:1}}><Icon.external/></span> Abrir documento
+              </button>
+              <button style={{padding:'8px 12px',background:'rgba(255,255,255,.05)',
+                border:'1px solid rgba(255,255,255,.1)',borderRadius:7,color:'rgba(232,237,242,.5)',
+                fontSize:12,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:5}}
+                onClick={()=>alert('Formulario de observaciones (en producción: Google Forms)')}>
+                <span style={{paddingTop:1}}><Icon.chat/></span> Observación
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── MAIN APP ─────────────────────────────────────────
+function App(){
+  const [tab,setTab]=useState('inicio');
+  const [filterFamily,setFilterFamily]=useState(null);
+  const [filterProcess,setFilterProcess]=useState(null);
+  const [expandedSection,setExpandedSection]=useState(null);
+  const sectionRef=useRef({});
+
+  const navItems=[
+    {id:'inicio',label:'Inicio'},
+    {id:'arquitectura',label:'Integralidad LOGIRD'},
+    {id:'flujos',label:'Flujos'},
+    {id:'matriz',label:'Matriz'},
+    {id:'roadmap',label:'Roadmap'},
+    {id:'documentos',label:'Documentos'},
+    {id:'actores',label:'Actores'},
+    {id:'decisiones',label:'Decisiones'},
+    {id:'resultados',label:'Resultados'},
+  ];
+
+  const scrollTo=(id)=>{
+    const el=document.getElementById(id);
+    if(el) el.scrollIntoView({behavior:'smooth',block:'start'});
+    setTab(id);
+  };
+
+  useEffect(()=>{
+    const obs=new IntersectionObserver(entries=>{
+      entries.forEach(e=>{ if(e.isIntersecting) setTab(e.target.id); });
+    },{threshold:.25,rootMargin:'-60px 0px -40% 0px'});
+    navItems.forEach(n=>{ const el=document.getElementById(n.id); if(el) obs.observe(el); });
+    return()=>obs.disconnect();
+  },[]);
+
+  const sectionStyle={
+    padding:'80px 40px 60px',maxWidth:1100,margin:'0 auto',
+  };
+
+  return(
+    <>
+      {/* ── NAV ── */}
+      <nav style={{position:'fixed',top:0,left:0,right:0,zIndex:100,
+        background:'rgba(7,16,28,.97)',backdropFilter:'blur(12px)',
+        borderBottom:'1px solid rgba(245,158,11,.2)',
+        padding:'0 28px',height:56,display:'flex',alignItems:'center',justifyContent:'space-between',gap:16}}>
+        <div style={{fontSize:12,fontWeight:800,color:'#F59E0B',letterSpacing:2,whiteSpace:'nowrap',flexShrink:0}}>
+          SNGR · GIRD · 2026
+        </div>
+        <div style={{display:'flex',gap:14,overflowX:'auto',scrollbarWidth:'none'}}>
+          {navItems.map(n=>(
+            <button key={n.id} onClick={()=>scrollTo(n.id)}
+              className={`nav-link${tab===n.id?' active':''}`}
+              style={{background:'none',border:'none',padding:'4px 0'}}>
+              {n.label}
+            </button>
+          ))}
+        </div>
+        <div style={{fontSize:11,color:'rgba(232,237,242,.3)',whiteSpace:'nowrap',flexShrink:0,letterSpacing:.5}}>
+          BORRADOR 2026
+        </div>
+      </nav>
+
+      {/* ── HERO ── */}
+      <section id="inicio" style={{minHeight:'100vh',display:'flex',flexDirection:'column',
+        justifyContent:'center',padding:'100px 40px 60px',
+        background:'linear-gradient(135deg,#07101C 0%,#0F1D2E 50%,#07101C 100%)',position:'relative',overflow:'hidden'}}>
+        <div style={{position:'absolute',top:0,left:0,right:0,bottom:0,pointerEvents:'none',overflow:'hidden'}}>
+          <div style={{position:'absolute',top:'20%',left:'10%',width:400,height:400,borderRadius:'50%',
+            background:'rgba(59,130,246,.06)',filter:'blur(80px)'}}/>
+          <div style={{position:'absolute',bottom:'20%',right:'10%',width:300,height:300,borderRadius:'50%',
+            background:'rgba(245,158,11,.05)',filter:'blur(60px)'}}/>
+        </div>
+        <div style={{maxWidth:900,margin:'0 auto',position:'relative'}}>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:32}}>
+            <span className="chip" style={{background:'rgba(239,68,68,.15)',color:'#FCA5A5',border:'1px solid rgba(239,68,68,.3)',fontSize:11}}>
+              <span className="pulse-dot" style={{width:5,height:5,borderRadius:'50%',background:'#EF4444',display:'inline-block'}}/>
+              Alerta técnica · Ecuador 2026
+            </span>
+            <span className="chip" style={{background:'rgba(245,158,11,.1)',color:'#FCD34D',border:'1px solid rgba(245,158,11,.25)',fontSize:11}}>
+              LOGIRD 2024 · Marco de Sendai 2015–2030
+            </span>
+            <span className="chip" style={{background:'rgba(16,185,129,.1)',color:'#6EE7B7',border:'1px solid rgba(16,185,129,.25)',fontSize:11}}>
+              195 PDOTs evaluados · 5 familias · 7 procesos
+            </span>
+          </div>
+          <h1 style={{fontSize:'clamp(36px,5.5vw,76px)',fontWeight:900,lineHeight:1.06,letterSpacing:'-1.5px',marginBottom:28}}>
+            <span style={{color:'#E8EDF2'}}>De la norma</span><br/>
+            <span style={{background:'linear-gradient(90deg,#3B82F6,#8B5CF6)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>
+              a la acción integral.
+            </span>
+          </h1>
+          <p style={{fontSize:18,color:'rgba(232,237,242,.6)',lineHeight:1.75,maxWidth:700,marginBottom:48}}>
+            Arquitectura técnica integral para implementar los 7 procesos de la <strong style={{color:'rgba(232,237,242,.85)'}}>Ley Orgánica de Gestión Integral del Riesgo de Desastres</strong> en los 221 municipios del Ecuador. Cinco familias de instrumentos. Una sola ruta.
+          </p>
+          {/* Stats row */}
+          <div style={{display:'flex',flexWrap:'wrap',gap:20,marginBottom:56}}>
+            {[
+              {v:'195',l:'PDOTs evaluados',c:'#3B82F6'},
+              {v:'63.1',l:'Promedio GIRD / 100',c:'#F59E0B'},
+              {v:'68',l:'Cantones con brechas críticas',c:'#EF4444'},
+              {v:'5',l:'Familias de instrumentos',c:'#10B981'},
+              {v:'7',l:'Procesos LOGIRD cubiertos',c:'#8B5CF6'},
+            ].map((s,i)=>(
+              <div key={i} style={{textAlign:'center',padding:'16px 24px',
+                background:'rgba(255,255,255,.04)',border:`1px solid ${s.c}25`,
+                borderRadius:12,borderTop:`3px solid ${s.c}`,minWidth:120}}>
+                <div style={{fontSize:32,fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</div>
+                <div style={{fontSize:11,color:'rgba(232,237,242,.45)',marginTop:4,fontWeight:500}}>{s.l}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+            <button onClick={()=>scrollTo('arquitectura')}
+              style={{padding:'14px 32px',background:'linear-gradient(90deg,#1D4ED8,#6D28D9)',borderRadius:50,
+                fontSize:14,fontWeight:700,color:'#fff',border:'none',cursor:'pointer',
+                boxShadow:'0 8px 24px rgba(59,130,246,.3)',letterSpacing:.5}}>
+              Explorar la arquitectura →
+            </button>
+            <button onClick={()=>scrollTo('documentos')}
+              style={{padding:'14px 32px',background:'transparent',borderRadius:50,
+                fontSize:14,fontWeight:600,color:'rgba(232,237,242,.7)',
+                border:'1px solid rgba(255,255,255,.15)',cursor:'pointer'}}>
+              Ver documentos
+            </button>
+          </div>
+        </div>
+        <p style={{position:'absolute',bottom:32,left:'50%',transform:'translateX(-50%)',
+          fontSize:11,letterSpacing:3,color:'rgba(232,237,242,.2)',textTransform:'uppercase'}}>
+          ↓ navegar
+        </p>
+      </section>
+
+      {/* ── ARQUITECTURA ── */}
+      <section id="arquitectura" style={{...sectionStyle,paddingTop:100}}>
+        <div className="section-label">Arquitectura Integral de Implementación LOGIRD</div>
+        <h2 style={{fontSize:'clamp(24px,3.5vw,44px)',fontWeight:900,marginBottom:12,lineHeight:1.15}}>
+          Los instrumentos se conectan entre sí<br/>para implementar los 7 procesos de la LOGIRD
+        </h2>
+        <p style={{fontSize:15,color:'rgba(232,237,242,.5)',maxWidth:680,lineHeight:1.7,marginBottom:40}}>
+          "No es una biblioteca documental; es una ruta de implementación."
+          El diagrama muestra cómo los 7 procesos de la LOGIRD (círculo interno) se articulan con las 5 familias de instrumentos (círculo externo).
+        </p>
+        <ArchDiagram/>
+
+        {/* Process cards */}
+        <div style={{marginTop:48}}>
+          <div className="section-label" style={{marginBottom:20}}>7 Procesos de la LOGIRD</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:14}}>
+            {PROCESSES.map(p=>(
+              <div key={p.id} className="card-hover" style={{background:p.light,border:`1px solid ${p.border}`,
+                borderRadius:12,padding:18,display:'flex',gap:14}}>
+                <div style={{width:44,height:44,borderRadius:10,background:`rgba(${hexToRgb(p.color)},.2)`,
+                  border:`1.5px solid ${p.color}60`,display:'flex',alignItems:'center',justifyContent:'center',
+                  color:p.color,flexShrink:0}}>
+                  {Icon[p.icon]?.()}
+                </div>
+                <div>
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:5}}>
+                    <span style={{fontSize:10,fontWeight:700,color:p.color,background:`rgba(${hexToRgb(p.color)},.2)`,
+                      padding:'2px 7px',borderRadius:4}}>Art. {p.art} LOGIRD</span>
+                  </div>
+                  <div style={{fontSize:13,fontWeight:700,color:'rgba(232,237,242,.9)',marginBottom:4}}>
+                    {p.id}. {p.name}
+                  </div>
+                  <p style={{fontSize:11.5,color:'rgba(232,237,242,.5)',lineHeight:1.5}}>{p.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FLUJOS ── */}
+      <section id="flujos" style={{...sectionStyle,background:'rgba(255,255,255,.015)',paddingTop:80}}>
+        <div className="section-label">Flujos visuales</div>
+        <h2 style={{fontSize:'clamp(22px,3vw,40px)',fontWeight:900,marginBottom:12}}>De la LOGIRD a la implementación territorial</h2>
+        <p style={{fontSize:14,color:'rgba(232,237,242,.45)',maxWidth:600,marginBottom:40,lineHeight:1.7}}>
+          "La integralidad se demuestra en la relación entre procesos, actores, documentos y resultados."
+        </p>
+
+        {/* Main flow */}
+        <div style={{display:'flex',gap:0,overflowX:'auto',paddingBottom:16,marginBottom:48}}>
+          {[
+            {l:'LOGIRD',s:'Ley Orgánica',c:'#3B82F6',w:90},
+            {l:'7 Procesos',s:'Arts. 9–15',c:'#8B5CF6',w:90},
+            {l:'5 Familias',s:'Instrumentos',c:'#10B981',w:100},
+            {l:'Documentos',s:'14 borradores',c:'#F59E0B',w:100},
+            {l:'Actores',s:'SNGR · GAD · UGR',c:'#EF4444',w:110},
+            {l:'Decisiones',s:'Revisión y validación',c:'#06B6D4',w:120},
+            {l:'Implementación',s:'Progresiva',c:'#F97316',w:110},
+            {l:'Seguimiento',s:'Mejora continua',c:'#10B981',w:100},
+          ].map((s,i,arr)=>(
+            <div key={i} style={{display:'flex',alignItems:'center',flexShrink:0}}>
+              <div style={{padding:'14px 18px',background:`rgba(${hexToRgb(s.c)},.12)`,
+                border:`1px solid ${s.c}40`,borderRadius:10,textAlign:'center',width:s.w}}>
+                <div style={{fontSize:12,fontWeight:800,color:s.c,marginBottom:3}}>{s.l}</div>
+                <div style={{fontSize:10,color:'rgba(232,237,242,.4)',lineHeight:1.3}}>{s.s}</div>
+              </div>
+              {i<arr.length-1 && (
+                <div style={{padding:'0 6px',color:'rgba(245,158,11,.5)',fontSize:16,flexShrink:0}}>→</div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Relation map */}
+        <div className="section-label" style={{marginBottom:20}}>Mapa de relaciones entre instrumentos</div>
+        <h3 style={{fontSize:20,fontWeight:700,marginBottom:24,color:'rgba(232,237,242,.8)'}}>Cómo se conectan los instrumentos</h3>
+        <RelationMap/>
+
+        {/* Family cards */}
+        <div style={{marginTop:48}}>
+          <div className="section-label" style={{marginBottom:20}}>5 Familias de instrumentos</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:14}}>
+            {FAMILIES.map(f=>(
+              <div key={f.id} className="card-hover" style={{background:f.light,border:`1px solid ${f.border}`,
+                borderRadius:12,padding:20,borderTop:`3px solid ${f.color}`}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+                  <div style={{width:36,height:36,borderRadius:8,background:`rgba(${hexToRgb(f.color)},.2)`,
+                    display:'flex',alignItems:'center',justifyContent:'center',color:f.color}}>
+                    {Icon[f.icon]?.()}
+                  </div>
+                  <span className="chip" style={{background:`rgba(${hexToRgb(f.color)},.15)`,color:f.color,
+                    border:`1px solid ${f.color}40`,fontSize:10}}>{f.docs} docs</span>
+                </div>
+                <div style={{fontSize:13,fontWeight:800,color:'rgba(232,237,242,.9)',marginBottom:8}}>{f.name}</div>
+                <p style={{fontSize:11.5,color:'rgba(232,237,242,.5)',lineHeight:1.6}}>{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── MATRIZ ── */}
+      <section id="matriz" style={{...sectionStyle,paddingTop:80}}>
+        <div className="section-label">Matriz de integralidad</div>
+        <h2 style={{fontSize:'clamp(22px,3vw,40px)',fontWeight:900,marginBottom:12}}>Instrumentos frente a los 7 procesos LOGIRD</h2>
+        <p style={{fontSize:14,color:'rgba(232,237,242,.45)',maxWidth:640,marginBottom:36,lineHeight:1.7}}>
+          "Cada documento cumple una función dentro de la arquitectura de la Gestión Integral del Riesgo de Desastres."
+          La matriz muestra el tipo de aporte de cada familia a cada proceso.
+        </p>
+        <IntegralMatrix/>
+      </section>
+
+      {/* ── ROADMAP ── */}
+      <section id="roadmap" style={{...sectionStyle,background:'rgba(255,255,255,.015)',paddingTop:80}}>
+        <div className="section-label">Ruta de implementación</div>
+        <h2 style={{fontSize:'clamp(22px,3vw,40px)',fontWeight:900,marginBottom:12}}>Ruta del paquete técnico</h2>
+        <p style={{fontSize:14,color:'rgba(232,237,242,.45)',maxWidth:600,marginBottom:40,lineHeight:1.7}}>
+          9 pasos desde el borrador hasta la implementación progresiva en los GAD del Ecuador.
+          Haz clic en cada paso para ver su descripción.
+        </p>
+        <Roadmap/>
+      </section>
+
+      {/* ── DOCUMENTOS ── */}
+      <section id="documentos" style={{...sectionStyle,paddingTop:80}}>
+        <div className="section-label">Instrumentos y documentos</div>
+        <h2 style={{fontSize:'clamp(22px,3vw,40px)',fontWeight:900,marginBottom:12}}>Paquete técnico completo</h2>
+        <p style={{fontSize:14,color:'rgba(232,237,242,.45)',maxWidth:640,marginBottom:32,lineHeight:1.7}}>
+          "Este paquete permite diagnosticar, organizar, coordinar, planificar, financiar, implementar y dar seguimiento."
+          Usa los filtros para explorar los documentos por familia de instrumento o proceso LOGIRD.
+        </p>
+        {/* Filters */}
+        <div style={{marginBottom:28,display:'flex',flexDirection:'column',gap:14}}>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center'}}>
+            <span style={{fontSize:11,fontWeight:600,color:'rgba(232,237,242,.35)',letterSpacing:.5,minWidth:90}}>FAMILIA:</span>
+            <button className={`filter-btn${!filterFamily?' active':''}`} onClick={()=>setFilterFamily(null)}>Todas</button>
+            {FAMILIES.map(f=>(
+              <button key={f.id} className={`filter-btn${filterFamily===f.id?' active':''}`}
+                onClick={()=>setFilterFamily(filterFamily===f.id?null:f.id)}>
+                {f.short}
+              </button>
+            ))}
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8,alignItems:'center'}}>
+            <span style={{fontSize:11,fontWeight:600,color:'rgba(232,237,242,.35)',letterSpacing:.5,minWidth:90}}>PROCESO:</span>
+            <button className={`filter-btn${!filterProcess?' active':''}`} onClick={()=>setFilterProcess(null)}>Todos</button>
+            {PROCESSES.map(p=>(
+              <button key={p.id} className={`filter-btn${filterProcess===p.id?' active':''}`}
+                onClick={()=>setFilterProcess(filterProcess===p.id?null:p.id)}
+                style={filterProcess===p.id?{borderColor:p.color,color:p.color,background:`rgba(${hexToRgb(p.color)},.12)`}:{}}> 
+                {p.id}. {p.short}
+              </button>
+            ))}
+          </div>
+        </div>
+        <DocCards filterFamily={filterFamily} filterProcess={filterProcess}/>
+      </section>
+
+      {/* ── ACTORES ── */}
+      <section id="actores" style={{...sectionStyle,background:'rgba(255,255,255,.015)',paddingTop:80}}>
+        <div className="section-label">Mapa de actores</div>
+        <h2 style={{fontSize:'clamp(22px,3vw,40px)',fontWeight:900,marginBottom:12}}>Quién revisa, quién valida y quién implementa</h2>
+        <p style={{fontSize:14,color:'rgba(232,237,242,.45)',maxWidth:640,marginBottom:40,lineHeight:1.7}}>
+          Cada actor institucional tiene un rol específico en la revisión, validación, aplicación y seguimiento del paquete técnico.
+        </p>
+        <ActorMap/>
+      </section>
+
+      {/* ── DECISIONES ── */}
+      <section id="decisiones" style={{...sectionStyle,paddingTop:80}}>
+        <div className="section-label">Flujo de decisión para autoridades</div>
+        <h2 style={{fontSize:'clamp(22px,3vw,40px)',fontWeight:900,marginBottom:12}}>Decisiones para pasar del borrador a la implementación</h2>
+        <p style={{fontSize:14,color:'rgba(232,237,242,.45)',maxWidth:640,marginBottom:40,lineHeight:1.7}}>
+          Siete preguntas clave que las autoridades deben responder para avanzar progresivamente desde el borrador técnico hasta la implementación en territorio.
+        </p>
+        <DecisionFlow/>
+      </section>
+
+      {/* ── RESULTADOS ── */}
+      <section id="resultados" style={{...sectionStyle,background:'rgba(255,255,255,.015)',paddingTop:80}}>
+        <div className="section-label">Panel de resultados</div>
+        <h2 style={{fontSize:'clamp(22px,3vw,40px)',fontWeight:900,marginBottom:12}}>Resultados que habilita la arquitectura integral</h2>
+        <p style={{fontSize:14,color:'rgba(232,237,242,.45)',maxWidth:640,marginBottom:40,lineHeight:1.7}}>
+          No indicadores inventados, sino capacidades reales que este paquete técnico activa en el sistema nacional de gestión de riesgos.
+        </p>
+        <ResultsPanel/>
+      </section>
+
+      {/* ── CTA FINAL ── */}
+      <section style={{padding:'80px 40px',textAlign:'center',
+        background:'linear-gradient(135deg,#07101C 0%,#0F1D2E 60%,#07101C 100%)',position:'relative',overflow:'hidden'}}>
+        <div style={{position:'absolute',top:'30%',left:'30%',width:500,height:300,
+          background:'radial-gradient(ellipse,rgba(59,130,246,.08),transparent)',filter:'blur(40px)',pointerEvents:'none'}}/>
+        <div style={{position:'relative',maxWidth:700,margin:'0 auto'}}>
+          <div style={{fontSize:11,letterSpacing:3,color:'#F59E0B',fontWeight:700,textTransform:'uppercase',marginBottom:20}}>
+            Secretaría Nacional de Gestión de Riesgos · DPEGR · 2026
+          </div>
+          <h2 style={{fontSize:'clamp(28px,4vw,58px)',fontWeight:900,lineHeight:1.1,marginBottom:24}}>
+            La evidencia está.<br/>
+            <span style={{background:'linear-gradient(90deg,#3B82F6,#8B5CF6)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>
+              Los instrumentos están.
+            </span><br/>
+            Solo falta su aprobación.
+          </h2>
+          <p style={{fontSize:17,color:'rgba(232,237,242,.55)',lineHeight:1.8,marginBottom:48,maxWidth:580,margin:'0 auto 48px'}}>
+            195 PDOTs evaluados · 5 familias · 14 documentos borrador · 7 procesos LOGIRD cubiertos · Marco de Sendai 2030
+          </p>
+          <div style={{display:'flex',gap:14,justifyContent:'center',flexWrap:'wrap'}}>
+            <button style={{padding:'15px 36px',background:'linear-gradient(90deg,#1D4ED8,#6D28D9)',borderRadius:50,
+              fontSize:14,fontWeight:700,color:'#fff',border:'none',cursor:'pointer',
+              boxShadow:'0 8px 24px rgba(59,130,246,.3)'}}
+              onClick={()=>window.print()}>
+              🖨️ Imprimir / Compartir
+            </button>
+            <button style={{padding:'15px 36px',background:'rgba(245,158,11,.15)',borderRadius:50,
+              fontSize:14,fontWeight:700,color:'#F59E0B',border:'1px solid rgba(245,158,11,.35)',cursor:'pointer'}}
+              onClick={()=>scrollTo('documentos')}>
+              Ver documentos →
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer style={{padding:'24px 40px',background:'#040A12',borderTop:'1px solid rgba(255,255,255,.05)',
+        display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
+        <div style={{fontSize:13,fontWeight:800,color:'#F59E0B',letterSpacing:2}}>SNGR · DPEGR · Ecuador</div>
+        <div style={{fontSize:11,color:'rgba(232,237,242,.2)'}}>
+          Dirección de Políticas y Estándares en Gestión de Riesgos · Junio 2026 · Prototipo para revisión de autoridades
+        </div>
+      </footer>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
